@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <title>Đang kết nối hệ thống trực tuyến...</title>
+  <style>
+    body { margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center; background: #0f172a; color: #f8fafc; font-family: system-ui, -apple-system, sans-serif; padding: 20px; box-sizing: border-box; }
+    .card { max-width: 420px; width: 100%; background: #1e293b; border: 1px solid #334155; border-radius: 16px; padding: 28px 24px; text-align: center; box-shadow: 0 20px 40px rgba(0,0,0,.35); }
+    .spin { width: 38px; height: 38px; border: 3px solid rgba(245,158,11,.25); border-top-color: #f59e0b; border-radius: 50%; margin: 0 auto 16px; animation: sp .75s linear infinite; }
+    @keyframes sp { to { transform: rotate(360deg); } }
+    h1 { font-size: 17px; margin: 0 0 8px; color: #f8fafc; }
+    p { font-size: 13.5px; color: #94a3b8; margin: 0; line-height: 1.5; }
+    a { display: inline-block; margin-top: 14px; color: #fbbf24; font-size: 13px; text-decoration: none; font-weight: 600; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="spin" id="sp"></div>
+    <h1 id="ttl">Đang chuyển hướng tới Cổng Trực Tuyến...</h1>
+    <p id="msg">Hệ thống đang kết nối tự động tới đường hầm máy chủ đang hoạt động.</p>
+    <a id="manual-link" href="#" style="display:none">Bấm vào đây nếu trình duyệt không tự chuyển &rarr;</a>
+  </div>
+  <script>
+    (function () {
+      var GIST_ID = '17e95a8aa12bad2f4d6a96ca338d70cd';
+      var PREFIX = '/hiensol-live';
+
+      function computeRelativeTarget() {
+        var p = window.location.pathname || '/';
+        var sub = p.indexOf(PREFIX) === 0 ? p.slice(PREFIX.length) : p;
+        if (!sub || sub === '/') sub = '/index.html';
+        if (sub.charAt(0) !== '/') sub = '/' + sub;
+        var q = window.location.search || '';
+        var h = window.location.hash || '';
+        return sub + q + h;
+      }
+
+      function redirectTo(baseUrl) {
+        if (!baseUrl || baseUrl.indexOf('https://') !== 0) return false;
+        var cleanBase = baseUrl.replace(/\/+$/, '');
+        var fullUrl = cleanBase + computeRelativeTarget();
+        var lnk = document.getElementById('manual-link');
+        if (lnk) {
+          lnk.href = fullUrl;
+          lnk.style.display = 'inline-block';
+        }
+        window.location.replace(fullUrl);
+        return true;
+      }
+
+      function fetchFromGist() {
+        return fetch('https://api.github.com/gists/' + GIST_ID + '?cb=' + Date.now(), { cache: 'no-store' })
+          .then(function (r) { return r.ok ? r.json() : null; })
+          .then(function (d) {
+            if (!d || !d.files || !d.files['tunnel_pointer.json']) return '';
+            var parsed = JSON.parse(d.files['tunnel_pointer.json'].content || '{}');
+            return parsed.active_cloudflare_url || '';
+          })
+          .catch(function () { return ''; });
+      }
+
+      function fetchFromFallbackJson() {
+        return fetch(PREFIX + '/tunnel.json?cb=' + Date.now(), { cache: 'no-store' })
+          .then(function (r) { return r.ok ? r.json() : null; })
+          .then(function (d) { return (d && d.active_cloudflare_url) || ''; })
+          .catch(function () { return ''; });
+      }
+
+      fetchFromGist().then(function (url) {
+        if (redirectTo(url)) return;
+        return fetchFromFallbackJson().then(function (fbUrl) {
+          if (redirectTo(fbUrl)) return;
+          document.getElementById('ttl').textContent = 'Đang chờ máy chủ trực tuyến...';
+          document.getElementById('msg').textContent = 'Máy chủ hiện đang khởi động lại đường hầm. Trang sẽ tự động thử lại sau 5 giây.';
+          setTimeout(function () { window.location.reload(); }, 5000);
+        });
+      });
+    })();
+  </script>
+</body>
+</html>
